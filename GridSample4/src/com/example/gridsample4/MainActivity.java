@@ -74,26 +74,28 @@ public class MainActivity extends Activity implements OnClickListener{
 
 		Cursor c = db.rawQuery("Select * from TableTest order by random() limit 1;", null);
 		c.moveToFirst();
-		Cursor c2 = db.rawQuery("Select * from TableTest where name <> ? order by random() limit 8;", new String[]{c.getString(1)});
+		Cursor c2 = db.rawQuery("Select * from TableTest where kanji <> ? order by random() limit 8;", new String[]{c.getString(3)});
 		c2.moveToFirst();
 
 		right_id = c.getInt(0);
-		right_name = c.getString(1);
-		num_ok = c.getInt(2);
-		num_miss = c.getInt(3);
+		right_name = c.getString(3);
+		num_ok = c.getInt(5);
+		num_miss = c.getInt(6);
 
 		Resources res = getResources();
 		for(int i=0;i<=c2.getCount();i++){
 			if(i==8){
 				//正解ボタン設定
-				right_button_id = 0x7f080001+list[i];
+				right_button_id = 0x7f090001+list[i];
 				bitmap = BitmapFactory.decodeResource(res, 0x7f020001 + c.getInt(0));
 			}else{
 				//まわりのボタン設定
 				bitmap = BitmapFactory.decodeResource(res, 0x7f020001 + c2.getInt(0));
 				c2.moveToNext();
 			}
-			ImageButton Button = (ImageButton) findViewById(0x7f080001 + list[i]);
+			//bitmap = BitmapFactory.decodeResource(res, 0x7f020001 + c2.getInt(0));
+
+			ImageButton Button = (ImageButton) findViewById(0x7f090001 + list[i]);
 			Button.setOnClickListener(this);
 			GridLayout.LayoutParams params1 = new GridLayout.LayoutParams();
 			params1.width = width;
@@ -148,7 +150,7 @@ public class MainActivity extends Activity implements OnClickListener{
 				button.startAnimation(feedout);
 			}
 		}
-		db.update("TableTest", updateValues, "name=?", new String[]{right_name});
+		db.update("TableTest", updateValues, "kanji=?", new String[]{right_name});
 		buttons.clear();
 		//フェードアウト分の時間待ち
 		new Handler().postDelayed(new Runnable() {
