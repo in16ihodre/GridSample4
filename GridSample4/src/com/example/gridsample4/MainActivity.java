@@ -2,7 +2,7 @@ package com.example.gridsample4;
 
 import java.util.ArrayList;
 import java.util.List;
-
+import android.media.MediaPlayer;
 import android.os.Bundle;
 import android.os.Handler;
 import android.app.Activity;
@@ -20,16 +20,17 @@ import android.view.WindowManager;
 import android.view.View.OnClickListener;
 import android.view.animation.AlphaAnimation;
 import android.widget.GridLayout;
-import android.widget.GridLayout.LayoutParams;
+import android.widget.Button;
 import android.widget.ImageButton;
 import android.widget.ImageView;
 import android.widget.TextView;
-import android.widget.Toast;
 
 public class MainActivity extends Activity implements OnClickListener{
 
 	private  int right_button_id = 0;
-	private String right_name;
+	private String right_kanji;
+	private String right_kana;
+
 	private int right_id;
 
 	int[] list = {1, 2, 3, 4, 5, 6, 7, 8, 9};
@@ -43,6 +44,8 @@ public class MainActivity extends Activity implements OnClickListener{
 	private int x;
 	private int y;
 	private Bitmap bitmap;
+	private MediaPlayer se;
+
 
 
 	@Override
@@ -78,7 +81,8 @@ public class MainActivity extends Activity implements OnClickListener{
 		c2.moveToFirst();
 
 		right_id = c.getInt(0);
-		right_name = c.getString(3);
+		right_kanji = c.getString(3);
+		right_kana = c.getString(4);
 		num_ok = c.getInt(5);
 		num_miss = c.getInt(6);
 
@@ -87,6 +91,7 @@ public class MainActivity extends Activity implements OnClickListener{
 			if(i==8){
 				//正解ボタン設定
 				right_button_id = 0x7f090001+list[i];
+				se = MediaPlayer.create(getBaseContext(), 0x7f040000 + c.getInt(0) -1 );
 				bitmap = BitmapFactory.decodeResource(res, 0x7f020001 + c.getInt(0));
 			}else{
 				//まわりのボタン設定
@@ -113,17 +118,25 @@ public class MainActivity extends Activity implements OnClickListener{
 		//ボタン有効化
 		allbuttonEnable(true);
 		TextView message = (TextView)this.findViewById(R.id.textView1);
-		message.setText(right_name + "  は？");
+		message.setText(right_kanji + " は？");
+
+		message = (TextView)this.findViewById(R.id.textView4);
+		message.setText(right_kana + "は？");
 
 		message = (TextView)this.findViewById(R.id.textView2);
-		message.setText("id:"+ right_id + "   "+"name:" + right_name);
-		//message.setText((char)buttons.size());
+		message.setText("id:"+ right_id + "   "+"name:" + right_kanji);
 
 		message = (TextView)this.findViewById(R.id.textView3);
 		message.setText(list[0] + "  "+  list[1] + "  " + list[2] + "  " + list[3] + "  " +list[4] + "  "  + list[5] + "  " + list[6] + "  " + list[7] + "  " + list[8]);
 
-		message = (TextView)this.findViewById(R.id.textView4);
-		//message.setText(2);
+		Button soundbutton = (Button) findViewById(R.id.soundbutton);
+		soundbutton.setOnClickListener(new OnClickListener() {
+			@Override
+			public void onClick(View v) {
+				se.start();
+			}
+		});
+
 	}
 
 	//ボタンが押されたら
@@ -142,6 +155,9 @@ public class MainActivity extends Activity implements OnClickListener{
 			img.setImageResource(R.drawable.circle);
 			img.startAnimation( feedout );
 		}
+		else if(v.getId() == 0x7f090011){
+			se.start();
+		}
 		//不正解
 		else{
 			updateValues.put("miss",num_miss + 1 );
@@ -150,7 +166,7 @@ public class MainActivity extends Activity implements OnClickListener{
 				button.startAnimation(feedout);
 			}
 		}
-		db.update("TableTest", updateValues, "kanji=?", new String[]{right_name});
+		db.update("TableTest", updateValues, "kanji=?", new String[]{right_kanji});
 		buttons.clear();
 		//フェードアウト分の時間待ち
 		new Handler().postDelayed(new Runnable() {
