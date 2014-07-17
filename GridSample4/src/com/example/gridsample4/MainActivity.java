@@ -13,6 +13,7 @@ import android.database.sqlite.SQLiteDatabase;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.Point;
+import android.text.format.Time;
 import android.view.Display;
 import android.view.Menu;
 import android.view.View;
@@ -45,8 +46,11 @@ public class MainActivity extends Activity implements OnClickListener{
 	private int y;
 	private Bitmap bitmap;
 	private MediaPlayer se;
+	private SQLiteDatabase db2;
+	private Time time;
+	private String[] kanji = new String[10];
 
-
+	private String miss_strings;
 
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
@@ -55,8 +59,15 @@ public class MainActivity extends Activity implements OnClickListener{
 
 		buttons = new ArrayList<ImageButton>();
 
+		//絵データベース
 		MyOpenHelper helper = new MyOpenHelper(this);
 		db = helper.getReadableDatabase();
+
+		//成績データベース
+		MyOpenHelper2 helper2 = new MyOpenHelper2(this);
+		db2 = helper2.getReadableDatabase();
+
+		time = new Time("Asia/Tokyo");
 
 		//正解画像透明
 		findViewById(R.id.ImageView1).setVisibility(ImageView.INVISIBLE);
@@ -70,6 +81,8 @@ public class MainActivity extends Activity implements OnClickListener{
 		Point size = new Point();
 		disp.getSize(size);
 		width = size.x/3;
+
+
 	}
 	protected void onStart(){
 		super.onStart();
@@ -80,6 +93,7 @@ public class MainActivity extends Activity implements OnClickListener{
 		Cursor c2 = db.rawQuery("Select * from TableTest where kanji <> ? order by random() limit 8;", new String[]{c.getString(3)});
 		c2.moveToFirst();
 
+
 		right_id = c.getInt(0);
 		right_kanji = c.getString(3);
 		right_kana = c.getString(4);
@@ -89,12 +103,14 @@ public class MainActivity extends Activity implements OnClickListener{
 		Resources res = getResources();
 		for(int i=0;i<=c2.getCount();i++){
 			if(i==8){
-				//正解ボタン設定
+				//正解ボタンの画像設定
 				right_button_id = 0x7f090001+list[i];
 				se = MediaPlayer.create(getBaseContext(), 0x7f040000 + c.getInt(0) -1 );
 				bitmap = BitmapFactory.decodeResource(res, 0x7f020001 + c.getInt(0));
 			}else{
-				//まわりのボタン設定
+				//まわりのボタンの画像設定
+				 int num = list[i];
+				kanji[num] =c2.getString(3);
 				bitmap = BitmapFactory.decodeResource(res, 0x7f020001 + c2.getInt(0));
 				c2.moveToNext();
 			}
@@ -129,6 +145,9 @@ public class MainActivity extends Activity implements OnClickListener{
 		message = (TextView)this.findViewById(R.id.textView3);
 		message.setText(list[0] + "  "+  list[1] + "  " + list[2] + "  " + list[3] + "  " +list[4] + "  "  + list[5] + "  " + list[6] + "  " + list[7] + "  " + list[8]);
 
+		message = (TextView)this.findViewById(R.id.textView4);
+		//message.setText(kanji[1] + "  " + kanji[2] + "  " + kanji[3]);
+
 		Button soundbutton = (Button) findViewById(R.id.soundbutton);
 		soundbutton.setOnClickListener(new OnClickListener() {
 			@Override
@@ -152,11 +171,9 @@ public class MainActivity extends Activity implements OnClickListener{
 
 			updateValues.put("ok",num_ok + 1 );
 
+			miss_strings = right_kanji;
 			img.setImageResource(R.drawable.circle);
 			img.startAnimation( feedout );
-		}
-		else if(v.getId() == 0x7f090011){
-			se.start();
 		}
 		//不正解
 		else{
@@ -164,10 +181,21 @@ public class MainActivity extends Activity implements OnClickListener{
 			for(int i = 0;i<8;i++){
 				ImageButton button = buttons.get(i);
 				button.startAnimation(feedout);
+
+				miss_strings = kanji[(v.getId()-0x7f090001)];
 			}
 		}
 		db.update("TableTest", updateValues, "kanji=?", new String[]{right_kanji});
 		buttons.clear();
+
+		ContentValues insertValues = new ContentValues();
+		time.setToNow();
+		String date = time.year + "年" + (time.month+1) + "月" + time.monthDay + "日" +time.hour + "時" + time.minute + "分";
+		insertValues.put("date",(String)date);
+		insertValues.put("correct", (String)right_kanji);
+		insertValues.put("miss", (String)miss_strings);
+		db2.insert("recordTable", date, insertValues);
+
 		//フェードアウト分の時間待ち
 		new Handler().postDelayed(new Runnable() {
 			public void run() {
