@@ -2,11 +2,13 @@ package com.example.gridsample4;
 
 import java.util.ArrayList;
 import java.util.List;
+
 import android.media.MediaPlayer;
 import android.os.Bundle;
 import android.os.Handler;
 import android.app.Activity;
 import android.content.ContentValues;
+import android.content.Intent;
 import android.content.res.Resources;
 import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
@@ -16,6 +18,7 @@ import android.graphics.Point;
 import android.text.format.Time;
 import android.view.Display;
 import android.view.Menu;
+import android.view.MenuItem;
 import android.view.View;
 import android.view.WindowManager;
 import android.view.View.OnClickListener;
@@ -25,13 +28,14 @@ import android.widget.Button;
 import android.widget.ImageButton;
 import android.widget.ImageView;
 import android.widget.TextView;
+import android.widget.Toast;
 
 public class MainActivity extends Activity implements OnClickListener{
 
+	private static final long mSEC = 2500;
 	private  int right_button_id = 0;
 	private String right_kanji;
 	private String right_kana;
-
 	private int right_id;
 
 	int[] list = {1, 2, 3, 4, 5, 6, 7, 8, 9};
@@ -73,7 +77,7 @@ public class MainActivity extends Activity implements OnClickListener{
 		findViewById(R.id.ImageView1).setVisibility(ImageView.INVISIBLE);
 
 		feedout = new AlphaAnimation( 1, 0 );
-		feedout.setDuration(1000);
+		feedout.setDuration(mSEC);
 
 		WindowManager wm = (WindowManager)getSystemService(WINDOW_SERVICE);
 		// ディスプレイのインスタンス生成
@@ -86,13 +90,13 @@ public class MainActivity extends Activity implements OnClickListener{
 	}
 	protected void onStart(){
 		super.onStart();
+		buttons.clear();
 		shuffle(list);
 
 		Cursor c = db.rawQuery("Select * from TableTest order by random() limit 1;", null);
 		c.moveToFirst();
 		Cursor c2 = db.rawQuery("Select * from TableTest where kanji <> ? order by random() limit 8;", new String[]{c.getString(3)});
 		c2.moveToFirst();
-
 
 		right_id = c.getInt(0);
 		right_kanji = c.getString(3);
@@ -102,7 +106,7 @@ public class MainActivity extends Activity implements OnClickListener{
 
 		Resources res = getResources();
 		for(int i=0;i<=c2.getCount();i++){
-			if(i==8){
+			if(i==c2.getCount()){
 				//正解ボタンの画像設定
 				right_button_id = 0x7f090001+list[i];
 				se = MediaPlayer.create(getBaseContext(), 0x7f040000 + c.getInt(0) -1 );
@@ -114,7 +118,6 @@ public class MainActivity extends Activity implements OnClickListener{
 				bitmap = BitmapFactory.decodeResource(res, 0x7f020001 + c2.getInt(0));
 				c2.moveToNext();
 			}
-			//bitmap = BitmapFactory.decodeResource(res, 0x7f020001 + c2.getInt(0));
 
 			ImageButton Button = (ImageButton) findViewById(0x7f090001 + list[i]);
 			Button.setOnClickListener(this);
@@ -155,7 +158,6 @@ public class MainActivity extends Activity implements OnClickListener{
 				se.start();
 			}
 		});
-
 	}
 
 	//ボタンが押されたら
@@ -186,7 +188,7 @@ public class MainActivity extends Activity implements OnClickListener{
 			}
 		}
 		db.update("TableTest", updateValues, "kanji=?", new String[]{right_kanji});
-		buttons.clear();
+		//buttons.clear();
 
 		ContentValues insertValues = new ContentValues();
 		time.setToNow();
@@ -201,7 +203,7 @@ public class MainActivity extends Activity implements OnClickListener{
 			public void run() {
 				onStart();
 			}
-		}, 1000);
+		}, mSEC);
 	}
 
 	private void shuffle(int[] arr) {
@@ -244,6 +246,7 @@ public class MainActivity extends Activity implements OnClickListener{
 			x = 0;
 			y = 2;
 		}else if(i==8){
+
 			x = 1;
 			y = 2;
 		}else if(i==9){
@@ -253,15 +256,40 @@ public class MainActivity extends Activity implements OnClickListener{
 	}
 
 
-	/*protected void onResume(){
+	protected void onResume(){
 		super.onResume();
-	}*/
+	}
 
 	@Override
 	public boolean onCreateOptionsMenu(Menu menu) {
 		// Inflate the menu; this adds items to the action bar if it is present.
-		getMenuInflater().inflate(R.menu.main, menu);
+		//getMenuInflater().inflate(R.menu.main, menu);
+
+		// メニューの要素を追加
+	    menu.add("結果表示");
+	    // メニューの要素を追加して取得
+	    MenuItem actionItem = menu.add("Action Button");
+
+	    // SHOW_AS_ACTION_IF_ROOM:余裕があれば表示
+	    actionItem.setShowAsAction(MenuItem.SHOW_AS_ACTION_IF_ROOM);
+
+	    // アイコンを設定
+	    actionItem.setIcon(android.R.drawable.ic_menu_share);
 		return true;
+	}
+
+
+	public boolean onOptionsItemSelected(MenuItem item) {
+		if(item.getTitle().equals("結果表示")){
+			// インテントのインスタンス生成
+			Intent intent = new Intent(this, ShowDataBase.class);
+			// 次画面のアクティビティ起動
+			startActivity(intent);
+		    //Toast.makeText(this, "Selected Item: " + item.getTitle(), Toast.LENGTH_LONG).show();
+		}else{
+
+		}
+	    return true;
 	}
 
 }

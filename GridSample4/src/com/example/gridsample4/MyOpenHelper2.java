@@ -22,6 +22,15 @@ public class MyOpenHelper2 extends SQLiteOpenHelper {
         sql += ",name";
         sql += ")";
         db.execSQL(sql);
+
+        String sql2 = "";
+        sql2 += "create table recordTable2 (";
+        sql2 += " date text not null";
+        sql2 += ",correct text";
+        sql2 += ",miss  text";
+        sql2 += ",name";
+        sql2 += ")";
+        db.execSQL(sql2);
 	}
 
 	@Override
