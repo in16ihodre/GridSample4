@@ -23,6 +23,8 @@ public class ShowDataBase extends Activity {
 		super.onCreate(savedInstanceState);
 		setContentView(R.layout.show_database);
 
+		Log.v("MyTest", "ShowDataBase onCreate is called");
+
 		MyOpenHelper2 helper = new MyOpenHelper2(this);
 		SQLiteDatabase db = helper.getReadableDatabase();
 

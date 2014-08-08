@@ -7,8 +7,12 @@ import android.media.MediaPlayer;
 import android.os.Bundle;
 import android.os.Handler;
 import android.app.Activity;
+import android.app.AlertDialog;
+import android.app.AlertDialog.Builder;
 import android.content.ContentValues;
+import android.content.DialogInterface;
 import android.content.Intent;
+import android.content.res.Configuration;
 import android.content.res.Resources;
 import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
@@ -16,6 +20,7 @@ import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.Point;
 import android.text.format.Time;
+import android.util.Log;
 import android.view.Display;
 import android.view.Menu;
 import android.view.MenuItem;
@@ -33,6 +38,7 @@ import android.widget.Toast;
 public class MainActivity extends Activity implements OnClickListener{
 
 	private static final long mSEC = 2500;
+	private static final int TrialTime = 10 * 1000;
 	private  int right_button_id = 0;
 	private String right_kanji;
 	private String right_kana;
@@ -55,11 +61,35 @@ public class MainActivity extends Activity implements OnClickListener{
 	private String[] kanji = new String[10];
 
 	private String miss_strings;
+	protected boolean confirm_dialog;
+	private boolean count = true;
+	private Builder field_alertDlg;
+	protected boolean reach_time;
+	private Builder field_alertDlg2;
+	protected String selected_hint = "音声のみ";
+
+	private int oto		= 0xff000000;
+	private int kana		= 0x00000000;
+	private int kanji2	= 0x00000000;
+	private boolean oto_button = true;
+
+	private TextView hint_message;
+	private TextView hint_message2;
+	private Button soundbutton;
+
 
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
 		super.onCreate(savedInstanceState);
 		setContentView(R.layout.activity_main);
+
+		Log.v("MyTest", "onCreate is called");
+
+		generate_continue_dialog();
+
+		generate_hintselect_dialog();
+
+		field_alertDlg2.create().show();
 
 		buttons = new ArrayList<ImageButton>();
 
@@ -79,17 +109,47 @@ public class MainActivity extends Activity implements OnClickListener{
 		feedout = new AlphaAnimation( 1, 0 );
 		feedout.setDuration(mSEC);
 
+		Resources resources = getResources();
+		Configuration config = resources.getConfiguration();
+
 		WindowManager wm = (WindowManager)getSystemService(WINDOW_SERVICE);
 		// ディスプレイのインスタンス生成
 		Display disp = wm.getDefaultDisplay();
 		Point size = new Point();
 		disp.getSize(size);
-		width = size.x/3;
 
+		switch(config.orientation) {
+		case Configuration.ORIENTATION_PORTRAIT:
+			width = size.x/3;
+			break;
+		case Configuration.ORIENTATION_LANDSCAPE:
+			width = (int) ((size.y-(size.y*0.2))/3);
+			break;
+		default :
+		}
+
+		Log.v("MyTest", String.valueOf(size.y));
 
 	}
+
+
 	protected void onStart(){
 		super.onStart();
+
+		Log.v("MyTest", "onStart is called");
+
+		if(count){
+			new Handler().postDelayed(new Runnable() {
+				public void run() {
+					reach_time = true;
+				}
+			}, TrialTime );
+			count = false;
+		}
+		if(reach_time){
+			field_alertDlg.create().show();
+		}
+
 		buttons.clear();
 		shuffle(list);
 
@@ -113,7 +173,7 @@ public class MainActivity extends Activity implements OnClickListener{
 				bitmap = BitmapFactory.decodeResource(res, 0x7f020001 + c.getInt(0));
 			}else{
 				//まわりのボタンの画像設定
-				 int num = list[i];
+				int num = list[i];
 				kanji[num] =c2.getString(3);
 				bitmap = BitmapFactory.decodeResource(res, 0x7f020001 + c2.getInt(0));
 				c2.moveToNext();
@@ -136,22 +196,24 @@ public class MainActivity extends Activity implements OnClickListener{
 
 		//ボタン有効化
 		allbuttonEnable(true);
-		TextView message = (TextView)this.findViewById(R.id.textView1);
-		message.setText(right_kanji + " は？");
 
-		message = (TextView)this.findViewById(R.id.textView4);
-		message.setText(right_kana + "は？");
+		hint_message = (TextView)this.findViewById(R.id.textView1);
+		hint_message.setText(right_kanji + " は？");
 
-		message = (TextView)this.findViewById(R.id.textView2);
+		hint_message2 = (TextView)this.findViewById(R.id.textView4);
+		hint_message2.setText(right_kana + "は？");
+
+		TextView message = (TextView)this.findViewById(R.id.textView2);
 		message.setText("id:"+ right_id + "   "+"name:" + right_kanji);
 
 		message = (TextView)this.findViewById(R.id.textView3);
 		message.setText(list[0] + "  "+  list[1] + "  " + list[2] + "  " + list[3] + "  " +list[4] + "  "  + list[5] + "  " + list[6] + "  " + list[7] + "  " + list[8]);
 
-		message = (TextView)this.findViewById(R.id.textView4);
+		//message = (TextView)this.findViewById(R.id.textView4);
 		//message.setText(kanji[1] + "  " + kanji[2] + "  " + kanji[3]);
 
-		Button soundbutton = (Button) findViewById(R.id.soundbutton);
+		soundbutton = (Button) findViewById(R.id.soundbutton);
+		soundbutton.setBackgroundColor(0xffffffff);
 		soundbutton.setOnClickListener(new OnClickListener() {
 			@Override
 			public void onClick(View v) {
@@ -255,9 +317,121 @@ public class MainActivity extends Activity implements OnClickListener{
 		}
 	}
 
+	private void generate_continue_dialog() {
+		// 確認ダイアログの生成
+		final AlertDialog.Builder alertDlg = new AlertDialog.Builder(this);
+		alertDlg.setTitle(TrialTime/60000 + "分経過しました！");
+		alertDlg.setMessage("まだつづけますか？");
+		alertDlg.setPositiveButton(
+				"はい",
+				new DialogInterface.OnClickListener() {
+					public void onClick(DialogInterface dialog, int which) {
+						count = true;
+						reach_time = false;
+					}
+				});
+		alertDlg.setNegativeButton(
+				"いいえ",
+				new DialogInterface.OnClickListener() {
+					public void onClick(DialogInterface dialog, int which) {
+						finish();
+					}
+				});
+
+		field_alertDlg = alertDlg;
+
+	}
+
+	private void generate_hintselect_dialog() {
+		final String item_list[] = new String[] {
+				"音声のみ",
+				"仮名のみ",
+				"漢字のみ",
+				"音声と仮名",
+				"音声と漢字",
+				"音声と仮名と漢字"
+		};
+
+		final AlertDialog.Builder alertDlg = new AlertDialog.Builder(this);
+		alertDlg.setTitle("ヒントの種類を選んでください");
+		alertDlg.setSingleChoiceItems(item_list, 0, new DialogInterface.OnClickListener() {
+			public void onClick(DialogInterface dialog, int whichButton) {
+				selected_hint = item_list[whichButton];
+				show_hint();
+				//⇒アイテムを選択した時のイベント処理
+				//Toast.makeText(MainActivity.this,item_list[whichButton] + "⇒アイテムを選択した時のイベント処理",Toast.LENGTH_SHORT).show();
+			}
+		});
+		alertDlg.setPositiveButton("OK", new DialogInterface.OnClickListener() {
+
+			public void onClick(DialogInterface dialog, int whichButton) {
+				//⇒OKボタンを押下した時のイベント処理
+				//【NOTE】
+				//whichButtonには選択したアイテムのインデックスが入っているわけでは
+				//ないので注意
+				//Toast.makeText(MainActivity.this,"OKボタンを押下しました。" + Integer.toString(whichButton),Toast.LENGTH_SHORT).show();
+				hint_message.setTextColor(kanji2);
+				hint_message2.setTextColor(kana);
+				soundbutton.setTextColor(oto);
+				soundbutton.setEnabled(oto_button);
+			}
+		});
+		field_alertDlg2 = alertDlg;
+	}
+
+	private void show_hint() {
+		if(selected_hint.equals("音声のみ")){
+			oto =		0xff000000;
+			kana =		0x00000000;
+			kanji2 =	0x00000000;
+			oto_button = true;
+		}else if(selected_hint.equals("仮名のみ")){
+			oto = 		0x00000000;
+			kana = 		0xff000000;
+			kanji2 = 	0x00000000;
+			oto_button = false;
+		}else if(selected_hint.equals("漢字のみ")){
+			oto = 		0x00000000;
+			kana = 		0x00000000;
+			kanji2 = 	0xff000000;
+			oto_button = false;
+		}else if(selected_hint.equals("音声と仮名")){
+			oto = 		0xff000000;
+			kana = 		0xff000000;
+			kanji2 = 	0x00000000;
+			oto_button = true;
+		}else if(selected_hint.equals("音声と漢字")){
+			oto = 		0xff000000;
+			kana = 		0x00000000;
+			kanji2 = 	0xff000000;
+			oto_button = true;
+		}else if(selected_hint.equals("音声と仮名と漢字")){
+			oto = 		0xff000000;
+			kana = 		0xff000000;
+			kanji2 = 	0xff000000;
+			oto_button = true;
+		}
+	}
+
 
 	protected void onResume(){
 		super.onResume();
+		Log.v("MyTest", "onResume is called");
+	}
+
+	protected void onPause(){
+		super.onPause();
+		Log.v("MyTest", "onPause is called");
+	}
+
+	protected void onStop(){
+		super.onStop();
+		Log.v("MyTest", "onStop is called");
+	}
+
+	protected void onDestroy(){
+		super.onDestroy();
+		Log.v("MyTest", "onDestroy is called");
 	}
 
 	@Override
@@ -266,15 +440,15 @@ public class MainActivity extends Activity implements OnClickListener{
 		//getMenuInflater().inflate(R.menu.main, menu);
 
 		// メニューの要素を追加
-	    menu.add("結果表示");
-	    // メニューの要素を追加して取得
-	    MenuItem actionItem = menu.add("Action Button");
+		menu.add("結果表示");
+		// メニューの要素を追加して取得
+		MenuItem actionItem = menu.add("Action Button");
 
-	    // SHOW_AS_ACTION_IF_ROOM:余裕があれば表示
-	    actionItem.setShowAsAction(MenuItem.SHOW_AS_ACTION_IF_ROOM);
+		// SHOW_AS_ACTION_IF_ROOM:余裕があれば表示
+		actionItem.setShowAsAction(MenuItem.SHOW_AS_ACTION_IF_ROOM);
 
-	    // アイコンを設定
-	    actionItem.setIcon(android.R.drawable.ic_menu_share);
+		// アイコンを設定
+		actionItem.setIcon(android.R.drawable.ic_menu_share);
 		return true;
 	}
 
@@ -285,11 +459,11 @@ public class MainActivity extends Activity implements OnClickListener{
 			Intent intent = new Intent(this, ShowDataBase.class);
 			// 次画面のアクティビティ起動
 			startActivity(intent);
-		    //Toast.makeText(this, "Selected Item: " + item.getTitle(), Toast.LENGTH_LONG).show();
+			//Toast.makeText(this, "Selected Item: " + item.getTitle(), Toast.LENGTH_LONG).show();
 		}else{
 
 		}
-	    return true;
+		return true;
 	}
 
 }
