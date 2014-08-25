@@ -18,6 +18,8 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 public class ShowDataBase extends Activity {
+	private static String user_name;
+
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
 		super.onCreate(savedInstanceState);
@@ -33,7 +35,19 @@ public class ShowDataBase extends Activity {
 		//Log.d("MyTest", alist.get(0));
 
 		// queryメソッドの実行例
-		Cursor c = db.query("recordTable", new String[] { "date", "correct", "miss" ,"name"}, null,null, null, null, null);
+		//Cursor c = db.query("recordTable", new String[] { "date", "correct", "miss" ,"name"}, null,null, null, null, null);
+		String sql = "";
+		//"Select * from TableTest where mola=4;
+        sql += "Select * from recordTable ";
+        sql += " where ";
+        sql += "name =  " ;
+        sql += " '" ;
+        sql += user_name;
+        sql += "' " ;
+        sql += ";";
+        Log.v("MyTest", "ShowDataBase user_name = " + user_name);
+        Log.v("MyTest", "ShowDataBase sql = " + sql);
+        Cursor c = db.rawQuery(sql, null);
 
 		boolean mov = c.moveToFirst();
 		while (mov) {
@@ -46,5 +60,9 @@ public class ShowDataBase extends Activity {
 		listView.setAdapter(adapter);
 		db.close();
 
+	}
+
+	public static void send_username(String user_name2) {
+		user_name = user_name2;
 	}
 }

@@ -22,12 +22,14 @@ import android.graphics.Point;
 import android.text.format.Time;
 import android.util.Log;
 import android.view.Display;
+import android.view.LayoutInflater;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
 import android.view.WindowManager;
 import android.view.View.OnClickListener;
 import android.view.animation.AlphaAnimation;
+import android.widget.EditText;
 import android.widget.GridLayout;
 import android.widget.Button;
 import android.widget.ImageButton;
@@ -37,10 +39,11 @@ import android.widget.Toast;
 
 public class MainActivity extends Activity implements OnClickListener{
 
-	private static final long mSEC = 2500;
-	private static final int TrialTime = 10 * 1000;
+	private static long mSEC = 2500;
+	private static final int TrialTime = 300 * 1000;
 	private  int right_button_id = 0;
 	private String right_kanji;
+
 	private String right_kana;
 	private int right_id;
 
@@ -68,30 +71,35 @@ public class MainActivity extends Activity implements OnClickListener{
 	private Builder field_alertDlg2;
 	protected String selected_hint = "音声のみ";
 
-	private int oto		= 0xff000000;
-	private int kana		= 0x00000000;
-	private int kanji2	= 0x00000000;
-	private boolean oto_button = true;
-
 	private TextView hint_message;
 	private TextView hint_message2;
 	private Button soundbutton;
 
+	private Builder field_adduserDlg;
+	private Builder field_selectuserDlg;
+	protected String user_name = null;
+	String[] item_list;
+	private MediaPlayer seikaisound;
+	private MediaPlayer syutudaisound;
+
+	private final Handler hint_handler = new Handler();
+	private final Runnable invisibleHint = new Runnable() {
+		@Override
+		public void run() {
+			hint_message.setVisibility(View.INVISIBLE);
+			hint_message2.setVisibility(View.INVISIBLE);
+		}
+	};
 
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
 		super.onCreate(savedInstanceState);
 		setContentView(R.layout.activity_main);
 
-		Log.v("MyTest", "onCreate is called");
-
-		generate_continue_dialog();
-
-		generate_hintselect_dialog();
-
-		field_alertDlg2.create().show();
-
 		buttons = new ArrayList<ImageButton>();
+
+		seikaisound = MediaPlayer.create(getBaseContext(),R.raw.sou0_seikai2);
+		syutudaisound = MediaPlayer.create(getBaseContext(),R.raw.sou0_syutudai1);
 
 		//絵データベース
 		MyOpenHelper helper = new MyOpenHelper(this);
@@ -100,6 +108,45 @@ public class MainActivity extends Activity implements OnClickListener{
 		//成績データベース
 		MyOpenHelper2 helper2 = new MyOpenHelper2(this);
 		db2 = helper2.getReadableDatabase();
+
+
+		generate_continue_dialog();
+
+		generate_hintselect_dialog();
+
+		generate_userselect_dialog();
+
+		generate_adduser_dialog();
+
+
+		Cursor c = db2 .rawQuery("Select * from userList", null);
+		boolean mov = c.moveToFirst();
+		item_list = new String[c.getCount()];
+
+		for(int i=0;i<c.getCount();i++){
+			item_list[i] = c.getString(0);
+			Log.v("MyTest", c.getString(0));
+			mov = c.moveToNext();
+		}
+		c.close();
+		//db2.close();
+
+
+		field_selectuserDlg.setSingleChoiceItems(item_list, 0, new DialogInterface.OnClickListener() {
+			public void onClick(DialogInterface dialog, int whichButton) {
+				//リストを選択した時の処理
+				user_name = item_list[whichButton];
+				Log.v("MyTest", "select = " +user_name);
+			}
+		});
+
+		Log.v("MyTest", "onCreate is called");
+
+		//エラー
+		user_name = item_list[0];
+
+		field_selectuserDlg.create().show();
+
 
 		time = new Time("Asia/Tokyo");
 
@@ -118,18 +165,16 @@ public class MainActivity extends Activity implements OnClickListener{
 		Point size = new Point();
 		disp.getSize(size);
 
+
 		switch(config.orientation) {
 		case Configuration.ORIENTATION_PORTRAIT:
 			width = size.x/3;
 			break;
 		case Configuration.ORIENTATION_LANDSCAPE:
-			width = (int) ((size.y-(size.y*0.2))/3);
+			width = (int) ((size.y-(size.y*0.13))/3);
 			break;
 		default :
 		}
-
-		Log.v("MyTest", String.valueOf(size.y));
-
 	}
 
 
@@ -154,7 +199,10 @@ public class MainActivity extends Activity implements OnClickListener{
 		shuffle(list);
 
 		Cursor c = db.rawQuery("Select * from TableTest order by random() limit 1;", null);
+		//Cursor c = db.rawQuery("Select * from TableTest where kana = 'ホン';", null);
+
 		c.moveToFirst();
+
 		Cursor c2 = db.rawQuery("Select * from TableTest where kanji <> ? order by random() limit 8;", new String[]{c.getString(3)});
 		c2.moveToFirst();
 
@@ -164,12 +212,14 @@ public class MainActivity extends Activity implements OnClickListener{
 		num_ok = c.getInt(5);
 		num_miss = c.getInt(6);
 
+		Log.v("MyTest", c.getString(3));
+
 		Resources res = getResources();
 		for(int i=0;i<=c2.getCount();i++){
 			if(i==c2.getCount()){
 				//正解ボタンの画像設定
 				right_button_id = 0x7f090001+list[i];
-				se = MediaPlayer.create(getBaseContext(), 0x7f040000 + c.getInt(0) -1 );
+				se = MediaPlayer.create(getBaseContext(), 0x7f040000 + c.getInt(0) +1);
 				bitmap = BitmapFactory.decodeResource(res, 0x7f020001 + c.getInt(0));
 			}else{
 				//まわりのボタンの画像設定
@@ -194,42 +244,57 @@ public class MainActivity extends Activity implements OnClickListener{
 			buttons.add(Button);
 		}
 
-		//ボタン有効化
-		allbuttonEnable(true);
-
 		hint_message = (TextView)this.findViewById(R.id.textView1);
-		hint_message.setText(right_kanji + " は？");
+		hint_message.setText(right_kanji + " ");
+		hint_message.setTextSize(width/3);
+		hint_message.setVisibility(View.INVISIBLE);
 
-		hint_message2 = (TextView)this.findViewById(R.id.textView4);
-		hint_message2.setText(right_kana + "は？");
+		hint_message2 = (TextView)this.findViewById(R.id.textView2);
+		hint_message2.setText(right_kana + " ");
+		hint_message2.setTextSize(width/3);
+		hint_message2.setVisibility(View.INVISIBLE);
 
-		TextView message = (TextView)this.findViewById(R.id.textView2);
-		message.setText("id:"+ right_id + "   "+"name:" + right_kanji);
 
-		message = (TextView)this.findViewById(R.id.textView3);
-		message.setText(list[0] + "  "+  list[1] + "  " + list[2] + "  " + list[3] + "  " +list[4] + "  "  + list[5] + "  " + list[6] + "  " + list[7] + "  " + list[8]);
+		TextView message = (TextView)this.findViewById(R.id.textView3);
+		//message.setText("id:"+ right_id + "   "+"name:" + right_kanji);
+		message.setText("");
+
+		message = (TextView)this.findViewById(R.id.textView4);
+		//message.setText(list[0] + "  "+  list[1] + "  " + list[2] + "  " + list[3] + "  " +list[4] + "  "  + list[5] + "  " + list[6] + "  " + list[7] + "  " + list[8]);
+		message.setText("");
 
 		//message = (TextView)this.findViewById(R.id.textView4);
 		//message.setText(kanji[1] + "  " + kanji[2] + "  " + kanji[3]);
 
+
 		soundbutton = (Button) findViewById(R.id.soundbutton);
 		soundbutton.setBackgroundColor(0xffffffff);
+		soundbutton.setTextSize(width/3);
 		soundbutton.setOnClickListener(new OnClickListener() {
 			@Override
 			public void onClick(View v) {
-				se.start();
+				show_hint();
 			}
 		});
+		//ボタン有効化
+		allbuttonEnable(true);
+		soundbutton.setEnabled(true);
+		for(int i = 0;i<=8;i++){
+			buttons.get(i).setVisibility(ImageView.VISIBLE);
+		}
 	}
+
 
 	//ボタンが押されたら
 	@Override
 	public void onClick(View v) {
 		//ボタン無効化
 		allbuttonEnable(false);
+		soundbutton.setEnabled(false);
 		ContentValues updateValues = new ContentValues();
 		//正解
 		if(v.getId() ==right_button_id ){
+			seikaisound.start();
 			//Toast.makeText(MainActivity.this, "正解！", Toast.LENGTH_SHORT).show();
 			ImageView img = (ImageView)findViewById(R.id.ImageView1);
 
@@ -237,7 +302,12 @@ public class MainActivity extends Activity implements OnClickListener{
 
 			miss_strings = right_kanji;
 			img.setImageResource(R.drawable.circle);
+			//img.setScaleType(ImageView.ScaleType.CENTER_CROP );
+
+			img.setScaleX(3);
+			img.setScaleY(3);
 			img.startAnimation( feedout );
+
 		}
 		//不正解
 		else{
@@ -245,11 +315,14 @@ public class MainActivity extends Activity implements OnClickListener{
 			for(int i = 0;i<8;i++){
 				ImageButton button = buttons.get(i);
 				button.startAnimation(feedout);
-
+				buttons.get(i).setVisibility(ImageView.INVISIBLE);
 				miss_strings = kanji[(v.getId()-0x7f090001)];
+				mSEC = 4500;
 			}
 		}
-		db.update("TableTest", updateValues, "kanji=?", new String[]{right_kanji});
+		Log.d("MyTest","user = " + user_name);
+		db.update(user_name, updateValues, "kanji=?", new String[]{right_kanji});
+
 		//buttons.clear();
 
 		ContentValues insertValues = new ContentValues();
@@ -258,14 +331,17 @@ public class MainActivity extends Activity implements OnClickListener{
 		insertValues.put("date",(String)date);
 		insertValues.put("correct", (String)right_kanji);
 		insertValues.put("miss", (String)miss_strings);
+		insertValues.put("name", user_name);
 		db2.insert("recordTable", date, insertValues);
 
 		//フェードアウト分の時間待ち
 		new Handler().postDelayed(new Runnable() {
 			public void run() {
+				mSEC = 2500;
+				//syutudaisound.start();
 				onStart();
 			}
-		}, mSEC);
+		}, mSEC);//ボタンを押してから、次のセッションへ移るまでの時間
 	}
 
 	private void shuffle(int[] arr) {
@@ -308,7 +384,6 @@ public class MainActivity extends Activity implements OnClickListener{
 			x = 0;
 			y = 2;
 		}else if(i==8){
-
 			x = 1;
 			y = 2;
 		}else if(i==9){
@@ -357,7 +432,6 @@ public class MainActivity extends Activity implements OnClickListener{
 		alertDlg.setSingleChoiceItems(item_list, 0, new DialogInterface.OnClickListener() {
 			public void onClick(DialogInterface dialog, int whichButton) {
 				selected_hint = item_list[whichButton];
-				show_hint();
 				//⇒アイテムを選択した時のイベント処理
 				//Toast.makeText(MainActivity.this,item_list[whichButton] + "⇒アイテムを選択した時のイベント処理",Toast.LENGTH_SHORT).show();
 			}
@@ -365,52 +439,100 @@ public class MainActivity extends Activity implements OnClickListener{
 		alertDlg.setPositiveButton("OK", new DialogInterface.OnClickListener() {
 
 			public void onClick(DialogInterface dialog, int whichButton) {
+				//show_hint();
 				//⇒OKボタンを押下した時のイベント処理
 				//【NOTE】
 				//whichButtonには選択したアイテムのインデックスが入っているわけでは
 				//ないので注意
-				//Toast.makeText(MainActivity.this,"OKボタンを押下しました。" + Integer.toString(whichButton),Toast.LENGTH_SHORT).show();
-				hint_message.setTextColor(kanji2);
-				hint_message2.setTextColor(kana);
-				soundbutton.setTextColor(oto);
-				soundbutton.setEnabled(oto_button);
+				hint_message.setVisibility(View.INVISIBLE);
+				hint_message2.setVisibility(View.INVISIBLE);
 			}
 		});
 		field_alertDlg2 = alertDlg;
 	}
 
+	private void generate_adduser_dialog() {
+		LayoutInflater inflater = LayoutInflater.from(MainActivity.this);
+		View view = inflater.inflate(R.layout.dialog5, null);
+		final EditText editText = (EditText)view.findViewById(R.id.editText1);
+		final AlertDialog.Builder alertDlg = new AlertDialog.Builder(this);
+		alertDlg.setTitle("ユーザ名を入力してください");
+		alertDlg.setView(view);
+		alertDlg.setPositiveButton(
+				"OK",
+				new DialogInterface.OnClickListener() {
+					@Override
+					public void onClick(DialogInterface dialog, int which) {
+						user_name = editText.getText().toString();
+						Log.d("MyTest","input text = " + user_name);
+						ContentValues insertValues = new ContentValues();
+						insertValues.put("name",user_name);
+						db2.insert("userList", null, insertValues);
+						//db.close();
+						//field_selectuserDlg.create().show();
+						String sql = "";
+						sql += "create table ";
+						sql += user_name;
+						sql += " as select * from";
+						sql += " TableTest";
+						db.execSQL(sql);
+						//db.close();
+						//field_selectuserDlg.create().show();
+					}
+				});
+		field_adduserDlg = alertDlg;
+	}
+
+	private void generate_userselect_dialog() {
+		final AlertDialog.Builder alertDlg2 = new AlertDialog.Builder(this);
+		alertDlg2.setTitle("ユーザを選んでください");
+		alertDlg2.setNeutralButton("追加", new DialogInterface.OnClickListener() {
+			public void onClick(DialogInterface dialog, int whichButton) {
+				field_adduserDlg.create().show();
+			}
+		});
+		alertDlg2.setPositiveButton("OK", new DialogInterface.OnClickListener() {
+			public void onClick(DialogInterface dialog, int whichButton) {
+				ShowDataBase.send_username(user_name);
+				//
+				//user_name = item_list[whichButton];
+				//Log.v("MyTest", user_name);
+			}
+		});
+		field_selectuserDlg = alertDlg2;
+	}
+
+
 	private void show_hint() {
 		if(selected_hint.equals("音声のみ")){
-			oto =		0xff000000;
-			kana =		0x00000000;
-			kanji2 =	0x00000000;
-			oto_button = true;
+			se.start();
+			hint_message.setVisibility(View.INVISIBLE);
+			hint_message2.setVisibility(View.INVISIBLE);
+
 		}else if(selected_hint.equals("仮名のみ")){
-			oto = 		0x00000000;
-			kana = 		0xff000000;
-			kanji2 = 	0x00000000;
-			oto_button = false;
+			hint_message.setVisibility(View.INVISIBLE);
+			hint_message2.setVisibility(View.VISIBLE);
+
 		}else if(selected_hint.equals("漢字のみ")){
-			oto = 		0x00000000;
-			kana = 		0x00000000;
-			kanji2 = 	0xff000000;
-			oto_button = false;
+			hint_message.setVisibility(View.VISIBLE);
+			hint_message2.setVisibility(View.INVISIBLE);
+
 		}else if(selected_hint.equals("音声と仮名")){
-			oto = 		0xff000000;
-			kana = 		0xff000000;
-			kanji2 = 	0x00000000;
-			oto_button = true;
+			hint_message.setVisibility(View.INVISIBLE);
+			hint_message2.setVisibility(View.VISIBLE);
+			se.start();
+
 		}else if(selected_hint.equals("音声と漢字")){
-			oto = 		0xff000000;
-			kana = 		0x00000000;
-			kanji2 = 	0xff000000;
-			oto_button = true;
+			hint_message.setVisibility(View.VISIBLE);
+			hint_message2.setVisibility(View.INVISIBLE);
+			se.start();
+
 		}else if(selected_hint.equals("音声と仮名と漢字")){
-			oto = 		0xff000000;
-			kana = 		0xff000000;
-			kanji2 = 	0xff000000;
-			oto_button = true;
+			hint_message.setVisibility(View.VISIBLE);
+			hint_message2.setVisibility(View.VISIBLE);
+			se.start();
 		}
+		hint_handler.postDelayed(invisibleHint, 3000);
 	}
 
 
@@ -441,6 +563,7 @@ public class MainActivity extends Activity implements OnClickListener{
 
 		// メニューの要素を追加
 		menu.add("結果表示");
+		menu.add("ヒント選択");
 		// メニューの要素を追加して取得
 		MenuItem actionItem = menu.add("Action Button");
 
@@ -460,8 +583,9 @@ public class MainActivity extends Activity implements OnClickListener{
 			// 次画面のアクティビティ起動
 			startActivity(intent);
 			//Toast.makeText(this, "Selected Item: " + item.getTitle(), Toast.LENGTH_LONG).show();
-		}else{
-
+		}else if(item.getTitle().equals("ヒント選択")){
+			selected_hint = "音声のみ";
+			field_alertDlg2.create().show();
 		}
 		return true;
 	}

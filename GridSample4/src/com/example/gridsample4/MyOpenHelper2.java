@@ -5,6 +5,7 @@ import android.database.DatabaseErrorHandler;
 import android.database.sqlite.SQLiteDatabase;
 import android.database.sqlite.SQLiteDatabase.CursorFactory;
 import android.database.sqlite.SQLiteOpenHelper;
+import android.util.Log;
 
 public class MyOpenHelper2 extends SQLiteOpenHelper {
 
@@ -14,6 +15,7 @@ public class MyOpenHelper2 extends SQLiteOpenHelper {
 
 	@Override
 	public void onCreate(SQLiteDatabase db) {
+		Log.v("MyTest", "onCreate of MyOpenHelper is called");
 		String sql = "";
         sql += "create table recordTable (";
         sql += " date text not null";
@@ -24,18 +26,15 @@ public class MyOpenHelper2 extends SQLiteOpenHelper {
         db.execSQL(sql);
 
         String sql2 = "";
-        sql2 += "create table recordTable2 (";
-        sql2 += " date text not null";
-        sql2 += ",correct text";
-        sql2 += ",miss  text";
-        sql2 += ",name";
+        sql2 += " create table userList (";
+        sql2 += " name";
         sql2 += ")";
         db.execSQL(sql2);
 	}
 
 	@Override
 	public void onUpgrade(SQLiteDatabase db, int oldVersion, int newVersion) {
-		// TODO 自動生成されたメソッド・スタブ
+		Log.v("MyTest", "onUpgrade of MyOpenHelper is called");
 
 	}
 
